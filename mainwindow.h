@@ -11,6 +11,8 @@ QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
 {
+
+    friend class bomber;
     Q_OBJECT
 
 public:
@@ -19,22 +21,21 @@ public:
 
 protected:
     void keyPressEvent(QKeyEvent *e);
+    QGraphicsScene *scene;
 
 protected slots:
     void showTimer();
     void explode();
     void takeALive();
-    //void hideObject(QGraphicsItem*);
 
 private slots:
+    bool detectColision(QGraphicsItem*);
     void moveObjects();
-    bool detectColision();
-
+    void moveEnemies();
 
 private:
     Ui::MainWindow *ui;
 
-    QGraphicsScene *scene;
     QGraphicsEllipseItem *ellipse;
     QGraphicsEllipseItem *bomb;
     QGraphicsEllipseItem *key;
@@ -42,8 +43,10 @@ private:
     QGraphicsRectItem *door;
 
     bool ellipseGotKey=false;
+    char direction = 'L';
 
-    int gameTime=20, lives=3;
+    int sqrSize=50, ellipseRad=15, bombSize=20;
+    int points=0, gameTime=20, lives=3;
     int xBomb,yBomb;
 
     QTimer *timer;
@@ -51,6 +54,7 @@ private:
     QList<QGraphicsRectItem*> gameMap;
     QList<QGraphicsRectItem*> destructBlocks;
     QList<QGraphicsRectItem*> explosion;
+    QList<QGraphicsEllipseItem*> enemies;
 
     float xPos=0, yPos=0;
 };
