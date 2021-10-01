@@ -7,6 +7,10 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <QImage>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 using namespace std;
 
@@ -17,46 +21,63 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
+    QImage bomber("../practica5/BD/bomberman.png"),doorPic("../practica5/BD/door.png"),
+            keyPic("../practica5/BD/key.png"),enemyPic("../practica5/BD/enemy.png"),
+            bricks("../practica5/BD/bricks.png"),solid("../practica5/BD/solid.png");
     vector<vector<int>> array = fileToVector("../practica5/BD/map.txt");
 
     scene = new QGraphicsScene(this);
     ui->graphicsView->setScene(scene);
 
-    QBrush redBrush(Qt::red), grayBrush(Qt::gray),
-            darkGrayBrush(Qt::darkGray), brownBrush(Qt::darkRed),yellowBrush(Qt::yellow);
-    QPen blackPen(Qt::black);
+    QBrush redBrush(Qt::red),grayBrush(solid.scaled(sqrSize,sqrSize)), doorBrush(doorPic.scaled(sqrSize,sqrSize)), keyBrush(keyPic.scaled(sqrSize,sqrSize)),
+            bricksBrush(bricks.scaled(sqrSize,sqrSize)), bomberBrush(bomber.scaled(bomberSize,bomberSize)),
+            enemyBrush(enemyPic.scaled(30,30,Qt::KeepAspectRatioByExpanding));
+    QPen blackPen(Qt::black), transparentPen(Qt::transparent);
 
     blackPen.setWidth(1);
 
-    key = scene->addEllipse(50,0,25,25,blackPen,darkGrayBrush);
-    door = scene->addRect(200,-15,40,40,blackPen,brownBrush);
+    key = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,keyBrush);
+    key->setPos(QPointF(xKey,yKey));
+    destructBlocks.append(scene->addRect(xKey,yKey,sqrSize,sqrSize,transparentPen,bricksBrush));
+    door = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,doorBrush);
+    door->setPos(QPointF(xDoor,yDoor));
+    destructBlocks.append(scene->addRect(xDoor,yDoor,sqrSize,sqrSize,transparentPen,bricksBrush));
+    scene->setBackgroundBrush(Qt::darkGreen);
+
+
 
     int sqrRows=array.size(), sqrsNumb=array[1].size(),numbEnemies=8;
 
     for(int i=0;i<sqrRows;i++){
-        int rectX=-(9*sqrSize/4);
-        static int rectY=-(5*sqrSize/4);
+        int rectX=0;
+        static int rectY=0;
         for(int j=0;j<sqrsNumb;j++){
-            rectX+=sqrSize;
             if(array[i][j]==1){
-                gameMap.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,blackPen,grayBrush));
+                gameMap.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,grayBrush));
             }
             else if(array[i][j]==0&&(i!=1)){
                 int random = rand()%5;
                 if(random==1){
-                    destructBlocks.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,blackPen,darkGrayBrush));
+                    destructBlocks.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,bricksBrush));
                 }
                 else if(random==0&&enemies.size()!=numbEnemies&&i%2==0){
-                    enemies.append(scene->addEllipse(rectX+(sqrSize/4),rectY+(sqrSize/4),30,30,blackPen,redBrush));
+                    QGraphicsRectItem* temp = scene->addRect(0,0,32,32,transparentPen,enemyBrush);
+                    temp->setPos(rectX+(sqrSize/4),rectY+(sqrSize/4));
+                    enemies.append(temp);
                 }
             }
+            rectX+=sqrSize;
         }
         rectY+=sqrSize;
 
     }
 
-    ellipse = scene->addEllipse(xPos,yPos,ellipseRad*2,ellipseRad*2,blackPen,yellowBrush);
+    for(int i=0;i<enemies.size();i++){
+        (*ptrMovmtSpeed).push_back(movSpeed);
+    }
+
+    ellipse = scene->addRect(0,0,bomberSize,bomberSize,transparentPen,bomberBrush);
+    ellipse->setPos(xPos,yPos);
 
     ui->lives->display(lives);
     timer = new QTimer(this);
@@ -69,7 +90,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     timer = new QTimer(this);
     connect(timer,SIGNAL(timeout()),this,SLOT(moveEnemies()));
-    timer->start(500);
+    timer->start(150);
 
 
 
@@ -82,34 +103,27 @@ MainWindow::~MainWindow()
 
 void MainWindow::moveObjects(){
     ellipse->setPos(xPos,yPos);
-    if(xPos>340) ui->graphicsView->setSceneRect(xPos-(9*sqrSize/4),-(5*sqrSize/4),700,700);
+    ui->graphicsView->setSceneRect(xPos-sqrSize,0,700,700);
 }
 
 void MainWindow::moveEnemies(){
-    qreal movSpeed=5;
     for(auto en:qAsConst(enemies)){
-        if(detectColision(en)||direction=='L'){
-            en->setPos(en->x()-movSpeed,en->y());
-            direction = 'L';
-        }
-        if(detectColision(en)||direction=='U'){
-            en->setPos(en->x(),en->y()-movSpeed);
-            direction = 'U';
-        }
-        if(detectColision(en)||direction=='D'){
-            en->setPos(en->x(),en->y()+(movSpeed));
-            direction = 'D';
-        }
-        if(detectColision(en)||direction=='R'){
-            en->setPos(en->x()+movSpeed,en->y());
-            direction = 'R';
+        qreal objMovement = movmtSpeed[enemies.indexOf(en)];
+        en->setX(en->x()-objMovement);
+        if(detectColision(en)){
+            en->setPos(en->x()+objMovement,en->y()+objMovement);
+            if(detectColision(en)){
+                en->setY(en->y()-objMovement);
+                objMovement-=(qreal(2)*objMovement);
+                (*ptrMovmtSpeed)[enemies.indexOf(en)] = objMovement;
+            }
         }
     }
 }
 
 void MainWindow::takeALive(){
     ui->lives->display(--lives);
-    xPos=0,yPos=0;
+    xPos=xO,yPos=yO;
     ellipse->setPos(xPos,yPos);
 }
 
@@ -118,13 +132,11 @@ bool MainWindow::detectColision(QGraphicsItem* item){
 
     for(auto mapItem : qAsConst(gameMap)){
         if(item->collidesWithItem(mapItem)){
-            if(item!=ellipse) item->setPos(item->x()-qreal(1),item->y()-qreal(1));
             return true;
         }
     }
     for(auto mapItem : qAsConst(destructBlocks)){
         if(item->collidesWithItem(mapItem)){
-            if(item!=ellipse) item->setPos(item->x()-qreal(1),item->y()-qreal(1));
             return true;
         }
     }
@@ -138,10 +150,9 @@ bool MainWindow::detectColision(QGraphicsItem* item){
         }
     }
     if((ellipse->collidesWithItem(door))&&ellipseGotKey){
-        door->hide();
         QString text = "Winner!";
         ui->label->setText(text);
-        scene->~QGraphicsScene();
+        scene->clear();
     }
 
 
@@ -167,10 +178,12 @@ void MainWindow::keyPressEvent(QKeyEvent *event){
         if(detectColision(ellipse)) yPos-=movingSpace;
     }
     else if(event->key()==Qt::Key_Space){
-        QPen blackPen(Qt::black);
-        QBrush blackBrush(Qt::black);
-        xBomb=xPos+(ellipseRad/2), yBomb=yPos+(ellipseRad/2);
-        bomb = scene->addEllipse(xBomb,yBomb,bombSize,bombSize,blackPen,blackBrush);
+        QImage bombPic("../practica5/BD/bomb.png");
+        QBrush bombBrush(bombPic.scaled(bombSize,bombSize));
+        QPen transparentPen(Qt::transparent);
+        xBomb=xPos+(bomberSize/2), yBomb=yPos+(bomberSize/2);
+        bomb = scene->addRect(0,0,bombSize,bombSize,transparentPen,bombBrush);
+        bomb->setPos(xBomb,yBomb);
         timer = new QTimer(this);
         connect(timer,SIGNAL(timeout()),this,SLOT(explode()));
         timer->start(1000);
@@ -200,9 +213,14 @@ vector<vector<int>> fileToVector(string fLocation){
 }
 
 void MainWindow::showTimer(){
+    if(lives==0){
+        QString text = "Game Over!";
+        ui->label->setText(text);
+        scene->clear();
+    }
     if(gameTime==-1){
         takeALive();
-        gameTime=20;
+        gameTime=definedGameTime;
     }
     ui->timer->display(gameTime--);
 }

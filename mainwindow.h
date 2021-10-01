@@ -4,6 +4,8 @@
 #include <QMainWindow>
 #include <QGraphicsScene>
 #include <QTimer>
+#include <QImage>
+#include <vector>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -18,6 +20,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    friend QGraphicsScene::~QGraphicsScene();
 
 protected:
     void keyPressEvent(QKeyEvent *e);
@@ -36,26 +39,31 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    QGraphicsEllipseItem *ellipse;
-    QGraphicsEllipseItem *bomb;
-    QGraphicsEllipseItem *key;
+    QGraphicsRectItem *ellipse;
+    QGraphicsRectItem *bomb;
+    QGraphicsRectItem *key;
     QRectF *rect;
     QGraphicsRectItem *door;
 
     bool ellipseGotKey=false;
-    char direction = 'L';
+    char direction = 'U';
 
-    int sqrSize=50, ellipseRad=15, bombSize=20;
-    int points=0, gameTime=20, lives=3;
+    int sqrSize=50, bomberSize=30, bombSize=20;
+    int points=0, definedGameTime=120, gameTime=definedGameTime, lives=3;
     int xBomb,yBomb;
+    int xKey=250,yKey=50,xDoor=400,yDoor=50;
 
     QTimer *timer;
 
     QList<QGraphicsRectItem*> gameMap;
     QList<QGraphicsRectItem*> destructBlocks;
     QList<QGraphicsRectItem*> explosion;
-    QList<QGraphicsEllipseItem*> enemies;
+    QList<QGraphicsRectItem*> enemies;
 
-    float xPos=0, yPos=0;
+    qreal xO =60, yO =60, xPos=xO, yPos=yO;
+
+    std::vector<qreal> movmtSpeed {};
+    std::vector<qreal>* ptrMovmtSpeed=&movmtSpeed;
+    qreal movSpeed=5;
 };
 #endif // MAINWINDOW_H
