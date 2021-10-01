@@ -3,9 +3,13 @@
 
 #include <QMainWindow>
 #include <QGraphicsScene>
+#include <QGraphicsRectItem>
+#include <QKeyEvent>
 #include <QTimer>
-#include <QImage>
 #include <vector>
+#include <string>
+#include <fstream>
+#include <QImage>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }

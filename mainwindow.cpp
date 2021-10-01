@@ -1,18 +1,15 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <QGraphicsScene>
-#include <QGraphicsRectItem>
-#include <QKeyEvent>
-#include <QTimer>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <QImage>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
 using namespace std;
+
+/*
+ * El programa aun contiene algunos problemas:
+ * 1) Cuando se gana, o se pierde, el programa se cierra solo.
+ * 2) El movimiento de los enemigos es muy limitado.
+ * 3) la generacion de bloques, de la llave y la puerta, no son aleatorios.
+ * 3) El seguimiento del personaje, se puede mejorar para mejor visualizacion.
+ */
 
 vector<vector<int>> fileToVector(string);
 
@@ -21,21 +18,27 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    //CARGANDO IMAGENES PARA LOS ITEMS
     QImage bomber("../practica5/BD/bomberman.png"),doorPic("../practica5/BD/door.png"),
             keyPic("../practica5/BD/key.png"),enemyPic("../practica5/BD/enemy.png"),
             bricks("../practica5/BD/bricks.png"),solid("../practica5/BD/solid.png");
+
+    //VECTOR QUE CONTIENE EL FORMATO DEL MAPA
     vector<vector<int>> array = fileToVector("../practica5/BD/map.txt");
 
+    //CREACION DE ESCENA
     scene = new QGraphicsScene(this);
     ui->graphicsView->setScene(scene);
 
-    QBrush redBrush(Qt::red),grayBrush(solid.scaled(sqrSize,sqrSize)), doorBrush(doorPic.scaled(sqrSize,sqrSize)), keyBrush(keyPic.scaled(sqrSize,sqrSize)),
+    //BROCHAS Y LAPICES PARA LOS ITEMS
+    QBrush grayBrush(solid.scaled(sqrSize,sqrSize)), doorBrush(doorPic.scaled(sqrSize,sqrSize)), keyBrush(keyPic.scaled(sqrSize,sqrSize)),
             bricksBrush(bricks.scaled(sqrSize,sqrSize)), bomberBrush(bomber.scaled(bomberSize,bomberSize)),
             enemyBrush(enemyPic.scaled(30,30,Qt::KeepAspectRatioByExpanding));
     QPen blackPen(Qt::black), transparentPen(Qt::transparent);
-
     blackPen.setWidth(1);
 
+    //SE AGREGAN LA LLAVE Y LA PUERTA A LA ESCENA
     key = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,keyBrush);
     key->setPos(QPointF(xKey,yKey));
     destructBlocks.append(scene->addRect(xKey,yKey,sqrSize,sqrSize,transparentPen,bricksBrush));
@@ -44,10 +47,8 @@ MainWindow::MainWindow(QWidget *parent)
     destructBlocks.append(scene->addRect(xDoor,yDoor,sqrSize,sqrSize,transparentPen,bricksBrush));
     scene->setBackgroundBrush(Qt::darkGreen);
 
-
-
+    //SE GAREGA EL MAPA A LA ESCENA RECORRIENDO EL VECTOR Y GENERANDO BLOQUES DESTRUCTIBLES Y ENEMIGOS "ALEATORIAMENTE"
     int sqrRows=array.size(), sqrsNumb=array[1].size(),numbEnemies=8;
-
     for(int i=0;i<sqrRows;i++){
         int rectX=0;
         static int rectY=0;
@@ -56,11 +57,11 @@ MainWindow::MainWindow(QWidget *parent)
                 gameMap.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,grayBrush));
             }
             else if(array[i][j]==0&&(i!=1)){
-                int random = rand()%5;
-                if(random==1){
+                int random = rand();
+                if(random%5>1){
                     destructBlocks.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,bricksBrush));
                 }
-                else if(random==0&&enemies.size()!=numbEnemies&&i%2==0){
+                else if(random%5==0&&enemies.size()!=numbEnemies&&i%2==0){
                     QGraphicsRectItem* temp = scene->addRect(0,0,32,32,transparentPen,enemyBrush);
                     temp->setPos(rectX+(sqrSize/4),rectY+(sqrSize/4));
                     enemies.append(temp);
@@ -72,22 +73,27 @@ MainWindow::MainWindow(QWidget *parent)
 
     }
 
+    //SE AGREGAN ELEMENTOS A UN VECTOR QUE CONTIENE EL MOVIMIENTO DE LOS ENEMIGOS
     for(int i=0;i<enemies.size();i++){
         (*ptrMovmtSpeed).push_back(movSpeed);
     }
 
+    //SE AGREGA EL PERSONAJE PRINCIPAL A LA ESCENA
     ellipse = scene->addRect(0,0,bomberSize,bomberSize,transparentPen,bomberBrush);
     ellipse->setPos(xPos,yPos);
 
+    //SE INICIALIZA EL TIMER DEL JUEGO
     ui->lives->display(lives);
     timer = new QTimer(this);
     connect(timer,SIGNAL(timeout()),this,SLOT(showTimer()));
     timer->start(1000);
 
+    //TIMER PARA MANTENER ENFOCADA LA ESCENA EN EL PERSONAJE
     timer = new QTimer(this);
     connect(timer,SIGNAL(timeout()),this,SLOT(moveObjects()));
-    timer->start(100);
+    timer->start(1);
 
+    //TIMER PARA MOVER ENEMIGOS
     timer = new QTimer(this);
     connect(timer,SIGNAL(timeout()),this,SLOT(moveEnemies()));
     timer->start(150);
@@ -178,15 +184,17 @@ void MainWindow::keyPressEvent(QKeyEvent *event){
         if(detectColision(ellipse)) yPos-=movingSpace;
     }
     else if(event->key()==Qt::Key_Space){
+        //SE CREA UNA BOMBA
         QImage bombPic("../practica5/BD/bomb.png");
         QBrush bombBrush(bombPic.scaled(bombSize,bombSize));
         QPen transparentPen(Qt::transparent);
         xBomb=xPos+(bomberSize/2), yBomb=yPos+(bomberSize/2);
         bomb = scene->addRect(0,0,bombSize,bombSize,transparentPen,bombBrush);
         bomb->setPos(xBomb,yBomb);
+        //SE CREA UN TIMER PARA QUE LA BOMBA EXPLOTE EN 2s
         timer = new QTimer(this);
         connect(timer,SIGNAL(timeout()),this,SLOT(explode()));
-        timer->start(1000);
+        timer->start(2000);
     }
 }
 
@@ -231,12 +239,14 @@ void MainWindow::explode()
     QBrush yellowBrush(Qt::yellow);
     int expDistance=20, c=2;
     bool liveTkenByExplosion=false;
+    //SE CREAN LA EXPLOSION
     for(int hor=0;hor<2;hor++){
         if(hor==1) c=(-c);
         explosion.append(scene->addRect(xBomb+(bombSize/2),yBomb+(bombSize/2),expDistance*c,expDistance,redPen,yellowBrush));
         explosion.append(scene->addRect(xBomb+(bombSize/2),yBomb+(bombSize/2),expDistance,expDistance*c,redPen,yellowBrush));
     }
 
+    //DETECCION DE COLLISION PARA SABER QUE SE DEBE ELIMINAR DE LA ESCENA
     for(auto exp : qAsConst(explosion)){
         for(auto block:qAsConst(destructBlocks)){
             if(exp->collidesWithItem(block)){
