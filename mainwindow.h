@@ -10,6 +10,7 @@
 #include <string>
 #include <fstream>
 #include <QImage>
+#include <QRandomGenerator>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -39,6 +40,7 @@ private slots:
     bool detectColision(QGraphicsItem*);
     void moveObjects();
     void moveEnemies();
+    void removeExplosions();
 
 private:
     Ui::MainWindow *ui;
@@ -49,15 +51,15 @@ private:
     QRectF *rect;
     QGraphicsRectItem *door;
 
-    bool ellipseGotKey=false;
-    char direction = 'U';
+    bool ellipseGotKey=false, doorExists=false, keyExists=false;
 
-    int sqrSize=50, bomberSize=30, bombSize=20;
+    int sqrSize=50, bomberSize=30;
     int points=0, definedGameTime=120, gameTime=definedGameTime, lives=3;
     int xBomb,yBomb;
     int xKey=250,yKey=50,xDoor=400,yDoor=50;
 
     QTimer *timer;
+    QTimer* tempTimer;
 
     QList<QGraphicsRectItem*> gameMap;
     QList<QGraphicsRectItem*> destructBlocks;

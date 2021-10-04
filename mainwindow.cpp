@@ -36,15 +36,8 @@ MainWindow::MainWindow(QWidget *parent)
             bricksBrush(bricks.scaled(sqrSize,sqrSize)), bomberBrush(bomber.scaled(bomberSize,bomberSize)),
             enemyBrush(enemyPic.scaled(30,30,Qt::KeepAspectRatioByExpanding));
     QPen blackPen(Qt::black), transparentPen(Qt::transparent);
-    blackPen.setWidth(1);
+    blackPen.setWidth(2);
 
-    //SE AGREGAN LA LLAVE Y LA PUERTA A LA ESCENA
-    key = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,keyBrush);
-    key->setPos(QPointF(xKey,yKey));
-    destructBlocks.append(scene->addRect(xKey,yKey,sqrSize,sqrSize,transparentPen,bricksBrush));
-    door = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,doorBrush);
-    door->setPos(QPointF(xDoor,yDoor));
-    destructBlocks.append(scene->addRect(xDoor,yDoor,sqrSize,sqrSize,transparentPen,bricksBrush));
     scene->setBackgroundBrush(Qt::darkGreen);
 
     //SE GAREGA EL MAPA A LA ESCENA RECORRIENDO EL VECTOR Y GENERANDO BLOQUES DESTRUCTIBLES Y ENEMIGOS "ALEATORIAMENTE"
@@ -56,12 +49,23 @@ MainWindow::MainWindow(QWidget *parent)
             if(array[i][j]==1){
                 gameMap.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,grayBrush));
             }
-            else if(array[i][j]==0&&(i!=1)){
-                int random = rand();
-                if(random%5>1){
+            else if(i!=1){
+                uniform_int_distribution<int> distribution(1,100);
+                int random = distribution(*QRandomGenerator::global());
+                if(random%5==0){
+                    if((random+5)>15&&keyExists==false){
+                        key = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,keyBrush);
+                        key->setPos(QPointF(rectX,rectY));
+                        keyExists=true;
+                    }
+                    else if((random+5)>10&&doorExists==false){
+                        door = scene->addRect(0,0,sqrSize,sqrSize,transparentPen,doorBrush);
+                        door->setPos(QPointF(rectX,rectY));
+                        doorExists=true;
+                    }
                     destructBlocks.append(scene->addRect(rectX,rectY,sqrSize,sqrSize,transparentPen,bricksBrush));
                 }
-                else if(random%5==0&&enemies.size()!=numbEnemies&&i%2==0){
+                else if(random%5==1&&enemies.size()!=numbEnemies&&i%2==0){
                     QGraphicsRectItem* temp = scene->addRect(0,0,32,32,transparentPen,enemyBrush);
                     temp->setPos(rectX+(sqrSize/4),rectY+(sqrSize/4));
                     enemies.append(temp);
@@ -109,7 +113,10 @@ MainWindow::~MainWindow()
 
 void MainWindow::moveObjects(){
     ellipse->setPos(xPos,yPos);
-    ui->graphicsView->setSceneRect(xPos-sqrSize,0,700,700);
+    //ui->graphicsView->setSceneRect(350,0,700,700);
+    if(xPos==xO&&yPos==yO) ui->graphicsView->setSceneRect(0,0,700,700);
+    else if(xPos>=xO+(20*50)) ui->graphicsView->setSceneRect(xO+(14*50),0,700,700);
+    else if(xPos-350>0 && xPos<xO+(20*50)) ui->graphicsView->setSceneRect(xPos-350,0,700,700);
 }
 
 void MainWindow::moveEnemies(){
@@ -186,16 +193,24 @@ void MainWindow::keyPressEvent(QKeyEvent *event){
     else if(event->key()==Qt::Key_Space){
         //SE CREA UNA BOMBA
         QImage bombPic("../practica5/BD/bomb.png");
-        QBrush bombBrush(bombPic.scaled(bombSize,bombSize));
+        QBrush bombBrush(bombPic.scaled(bomberSize,bomberSize));
         QPen transparentPen(Qt::transparent);
-        xBomb=xPos+(bomberSize/2), yBomb=yPos+(bomberSize/2);
-        bomb = scene->addRect(0,0,bombSize,bombSize,transparentPen,bombBrush);
-        bomb->setPos(xBomb,yBomb);
-        //SE CREA UN TIMER PARA QUE LA BOMBA EXPLOTE EN 2s
+        xBomb=xPos, yBomb=yPos;
+        bomb = scene->addRect(0,0,bomberSize,bomberSize,transparentPen,bombBrush);
+        bomb->setPos(xPos,yPos);
+        //SE CREA UN TIMER PARA QUE LA BOMBA EXPLOTE EN 1.5s
         timer = new QTimer(this);
         connect(timer,SIGNAL(timeout()),this,SLOT(explode()));
-        timer->start(2000);
+        timer->start(1500);
     }
+}
+
+void MainWindow::removeExplosions(){
+    for(auto expToRem : qAsConst(explosion)){
+        scene->removeItem(expToRem);
+    }
+    explosion.clear();
+    tempTimer->~QTimer();
 }
 
 vector<vector<int>> fileToVector(string fLocation){
@@ -235,16 +250,33 @@ void MainWindow::showTimer(){
 
 void MainWindow::explode()
 {
-    QPen redPen(Qt::red);
-    QBrush yellowBrush(Qt::yellow);
-    int expDistance=20, c=2;
+    int y=50, x=30, xExp=xBomb, yExp=yBomb+(bomberSize/2);
+    QPen transparentPen(Qt::transparent);
+    QImage exp("../practica5/BD/explosion.png"), expR("../practica5/BD/explosionR.png");
+    QBrush expBrushUp(exp.scaled(x,y)), expBrushDwn(exp.mirrored(false,true).scaled(x,y)),
+            expBrushRight(expR.mirrored(false,false).scaled(y,x)),
+            expBrushLeft(expR.mirrored(true,false).scaled(y,x));
     bool liveTkenByExplosion=false;
-    //SE CREAN LA EXPLOSION
-    for(int hor=0;hor<2;hor++){
-        if(hor==1) c=(-c);
-        explosion.append(scene->addRect(xBomb+(bombSize/2),yBomb+(bombSize/2),expDistance*c,expDistance,redPen,yellowBrush));
-        explosion.append(scene->addRect(xBomb+(bombSize/2),yBomb+(bombSize/2),expDistance,expDistance*c,redPen,yellowBrush));
+    //SE CREA LA EXPLOSION
+    for(int i=0;i<2;i++){
+        for(int j=-1;j<2;j+=2){
+            QGraphicsRectItem* temp;
+            if(i==0){
+                if(j==-1) temp = scene->addRect(0,0,x,y*j,transparentPen,expBrushUp);
+                else temp = scene->addRect(0,0,x,y*j,transparentPen,expBrushDwn);
+            }
+            else{
+                if(j==-1) temp = scene->addRect(0,0,x*j,y,transparentPen,expBrushLeft);
+                else temp = scene->addRect(0,0,x*j,y,transparentPen,expBrushRight);
+            }
+            temp->setPos(xExp,yExp);
+            explosion.append(temp);
+        }
+        xExp=xBomb+(bomberSize/2),yExp=yBomb;
+        int aux=y;
+        y=x,x=aux;
     }
+
 
     //DETECCION DE COLLISION PARA SABER QUE SE DEBE ELIMINAR DE LA ESCENA
     for(auto exp : qAsConst(explosion)){
@@ -268,10 +300,11 @@ void MainWindow::explode()
             takeALive();
             liveTkenByExplosion=true;
         }
-        scene->removeItem(exp);
     }
 
+    tempTimer = new QTimer();
+    connect(tempTimer,SIGNAL(timeout()),this,SLOT(removeExplosions()));
+    tempTimer->start(750);
     scene->removeItem(bomb);
-    explosion.clear();
     timer->~QTimer();
 }
